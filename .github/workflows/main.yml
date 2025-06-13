@@ -14,7 +14,7 @@ jobs:
     env:
       EMAIL_REMETENTE: ${{ secrets.EMAIL_REMETENTE }}
       SENHA_APP: ${{ secrets.SENHA_APP }}
-      EMAIL_DESTINATARIO: ${{ secrets.EMAIL_DESTINATARIO }}
+      EMAIL_DESTINO: ${{ secrets.EMAIL_DESTINO }}
 
     steps:
       # Passo 1: Faz o checkout completo do repositório
