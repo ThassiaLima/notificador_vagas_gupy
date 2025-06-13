@@ -29,8 +29,8 @@ ARQUIVO_CSV = "historico_vagas.csv"
 DATA_HOJE = str(date.today())
 
 EMAIL_REMETENTE = os.getenv("EMAIL_REMETENTE")
-EMAIL_SENHA = os.getenv("SENHA_APP")
-EMAIL_DESTINO = os.getenv("EMAIL_DESTINATARIO")
+SENHA_APP = os.getenv("SENHA_APP")
+EMAIL_DESTINO = os.getenv("EMAIL_DESTINO")
 
 # ==================== WEBDRIVER CONFIG ====================
 chrome_options = Options()
@@ -113,7 +113,7 @@ def enviar_email(vagas):
 
     try:
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(EMAIL_REMETENTE, EMAIL_SENHA)
+            server.login(EMAIL_REMETENTE, SENHA_APP)
             server.send_message(msg)
         print("✅ E-mail enviado com sucesso!")
     except Exception as e:
@@ -166,7 +166,7 @@ historico_atualizado.to_csv(ARQUIVO_CSV, index=False)
 print(f"💾 Histórico salvo com {len(historico_atualizado)} vagas em '{ARQUIVO_CSV}'.")
 
 # Envia e-mail com novas vagas
-if EMAIL_REMETENTE and EMAIL_SENHA and EMAIL_DESTINO:
+if EMAIL_REMETENTE and SENHA_APP and EMAIL_DESTINO:
     enviar_email(novas_vagas.to_dict("records"))
 else:
     print("⚠️ Variáveis de e-mail não configuradas.")
