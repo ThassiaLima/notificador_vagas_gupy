@@ -27,9 +27,9 @@ jobs:
         run: |
           echo '${{ secrets.GSHEET_CREDENTIALS_JSON }}' > credenciais.json
           echo "GOOGLE_APPLICATION_CREDENTIALS=credenciais.json" >> $GITHUB_ENV
-          echo "EMAIL_RECEPTOR=${{ secrets.EMAIL_RECEPTOR }}" >> $GITHUB_ENV
+          echo "EMAIL_RECEPTOR=${{ secrets.EMAIL_DESTINO }}" >> $GITHUB_ENV
           echo "EMAIL_REMETENTE=${{ secrets.EMAIL_REMETENTE }}" >> $GITHUB_ENV
-          echo "SENHA_REMETENTE=${{ secrets.SENHA_REMETENTE }}" >> $GITHUB_ENV
+          echo "SENHA_REMETENTE=${{ secrets.SENHA_APP}}" >> $GITHUB_ENV
 
       - name: Executar script principal
         run: |
