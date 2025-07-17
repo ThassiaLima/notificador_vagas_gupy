@@ -36,11 +36,13 @@ jobs:
         run: |
           printf "%s" "${{ secrets.GSHEET_CREDENTIALS_JSON }}" > credenciais.json
 
-      - name: Executar e Salvar Alterações
+            - name: Executar e Salvar Alterações
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git pull --ff-only
+
+          git pull --rebase
+
           python main.py
           git add historico_vagas.csv
 
@@ -51,3 +53,4 @@ jobs:
 
           git commit -m "Atualizar histórico de vagas [automático]"
           git push
+
