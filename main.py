@@ -14,8 +14,7 @@ import smtplib
 import random
 import gspread
 import json
-from oauth2client.service_account
-import ServiceAccountCredentials
+from oauth2client.service_account import ServiceAccountCredentials
 
 # ==================== CONFIGURAÇÕES ====================
 PALAVRAS_CHAVE = ["Analista de BI", "Business Intelligence", "Data", "Dados", "Analytics", "Product", "Produto"]
