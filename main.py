@@ -13,6 +13,7 @@ from email.mime.text import MIMEText
 import smtplib
 import random
 import gspread
+from gspread_dataframe import set_with_dataframe
 import json
 from oauth2client.service_account import ServiceAccountCredentials
 
@@ -171,6 +172,34 @@ print(f"💾 Histórico salvo com {len(historico_atualizado)} vagas em '{ARQUIVO
 
 
 def atualizar_google_sheets(df):
+    try:
+        import numpy as np
+        from gspread_dataframe import set_with_dataframe
+
+        # Carrega credenciais do JSON
+        with open("credenciais.json", "r") as f:
+            creds_dict = json.load(f)
+
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+        client = gspread.authorize(creds)
+
+        # Nome da planilha
+        spreadsheet = client.open("Historico Vagas Gupy")
+        sheet = spreadsheet.sheet1
+
+        # Limpa dados inválidos
+        df = df.replace([np.inf, -np.inf], np.nan).fillna("")
+
+        # Escreve todo o DataFrame de uma vez
+        sheet.clear()
+        set_with_dataframe(sheet, df)
+
+        print("✅ Planilha Google Sheets atualizada com sucesso!")
+
+    except Exception as e:
+        print(f"❌ Erro ao atualizar Google Sheets: {e}")
+
     try:
         import numpy as np  # Garante que esteja importado dentro da função, se quiser local
 
