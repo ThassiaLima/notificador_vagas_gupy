@@ -26,15 +26,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-          # NOVO PASSO: Upload para o Google Sheets
-      - name: Upload updated job history to Google Sheets
-        env:
-          GOOGLE_SERVICE_ACCOUNT_CREDENTIALS: '${{ secrets.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS }}'
-          GOOGLE_SHEETS_NAME: historico_vagas
-          SHEET_WORKSHEET_NAME: Vagas
-          run: |
-            echo "Iniciando upload para o Google Sheets..."
-            python upload_to_sheets.py # Executa o novo script de upload
+      - name: Criar arquivo de credenciais
+        run: |
+          echo "${{ secrets.GSHEET_CREDENTIALS_JSON }}" > credenciais.json 
+
       - name: Executar e Salvar Alterações
         run: >
           git config user.name "github-actions[bot]"
@@ -44,7 +39,6 @@ jobs:
 
 
           git pull --ff-only
-
 
           python main.py
 

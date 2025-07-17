@@ -12,6 +12,10 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import smtplib
 import random
+import gspread
+import json
+from oauth2client.service_account
+import ServiceAccountCredentials
 
 # ==================== CONFIGURAÇÕES ====================
 PALAVRAS_CHAVE = ["Analista de BI", "Business Intelligence", "Data", "Dados", "Analytics", "Product", "Produto"]
@@ -164,6 +168,36 @@ historico_atualizado = historico_atualizado.sort_values("data_abertura").drop_du
 # Salva CSV
 historico_atualizado.to_csv(ARQUIVO_CSV, index=False)
 print(f"💾 Histórico salvo com {len(historico_atualizado)} vagas em '{ARQUIVO_CSV}'.")
+
+
+
+def atualizar_google_sheets(df):
+    try:
+        # Carrega credenciais do JSON
+        with open("credenciais.json", "r") as f:
+            creds_dict = json.load(f)
+
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+        client = gspread.authorize(creds)
+
+        # Nome da planilha
+        spreadsheet = client.open("Historico Vagas Gupy")
+        sheet = spreadsheet.sheet1
+
+        # Limpa e reescreve tudo
+        sheet.clear()
+        sheet.append_row(df.columns.tolist())
+        for row in df.values.tolist():
+            sheet.append_row(row)
+        print("✅ Planilha Google Sheets atualizada com sucesso!")
+
+    except Exception as e:
+        print(f"❌ Erro ao atualizar Google Sheets: {e}")
+
+# Chamada da função
+atualizar_google_sheets(historico_atualizado)
+
 
 # Envia e-mail com novas vagas
 if EMAIL_REMETENTE and SENHA_APP and EMAIL_DESTINO:
