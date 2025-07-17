@@ -171,7 +171,41 @@ print(f"💾 Histórico salvo com {len(historico_atualizado)} vagas em '{ARQUIVO
 
 
 
-def atualizar_google_sheets(df):
+import time
+
+def atualizar_google_sheets(df, tentativas=3):
+    for tentativa in range(tentativas):
+        try:
+            from gspread_dataframe import set_with_dataframe
+            import numpy as np
+
+            with open("credenciais.json", "r") as f:
+                creds_dict = json.load(f)
+
+            scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+            creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+            client = gspread.authorize(creds)
+
+            spreadsheet = client.open("Historico Vagas Gupy")
+            sheet = spreadsheet.sheet1
+
+            df = df.replace([np.inf, -np.inf], np.nan).fillna("")
+
+            sheet.clear()
+            set_with_dataframe(sheet, df)
+
+            print("✅ Planilha Google Sheets atualizada com sucesso!")
+            return  # sai da função se deu certo
+
+        except Exception as e:
+            print(f"❌ Tentativa {tentativa + 1} falhou: {e}")
+            if "Quota exceeded" in str(e) and tentativa < tentativas - 1:
+                tempo_espera = 60 * (tentativa + 1)
+                print(f"⏳ Aguardando {tempo_espera} segundos antes de tentar novamente...")
+                time.sleep(tempo_espera)
+            else:
+                break
+
     try:
         import numpy as np
         from gspread_dataframe import set_with_dataframe
