@@ -172,6 +172,34 @@ print(f"💾 Histórico salvo com {len(historico_atualizado)} vagas em '{ARQUIVO
 
 def atualizar_google_sheets(df):
     try:
+        import numpy as np  # Garante que esteja importado dentro da função, se quiser local
+
+        # Carrega credenciais do JSON
+        with open("credenciais.json", "r") as f:
+            creds_dict = json.load(f)
+
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+        client = gspread.authorize(creds)
+
+        # Nome da planilha
+        spreadsheet = client.open("Historico Vagas Gupy")
+        sheet = spreadsheet.sheet1
+
+        # Limpeza dos dados para evitar erro de JSON
+        df = df.replace([np.inf, -np.inf], np.nan).fillna("")
+
+        # Limpa e reescreve tudo
+        sheet.clear()
+        sheet.append_row(df.columns.tolist())
+        for row in df.values.tolist():
+            sheet.append_row(row)
+        print("✅ Planilha Google Sheets atualizada com sucesso!")
+
+    except Exception as e:
+        print(f"❌ Erro ao atualizar Google Sheets: {e}")
+
+    try:
         # Carrega credenciais do JSON
         with open("credenciais.json", "r") as f:
             creds_dict = json.load(f)
