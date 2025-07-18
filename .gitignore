@@ -1,0 +1,11 @@
+# Arquivos de ambiente e credenciais
+.venv
+.env
+credenciais.json
+
+# Ignorar pacotes de instalação Debian
+*.deb
+
+# Arquivos gerados pelo Python
+__pycache__/
+*.pyc

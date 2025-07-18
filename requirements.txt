@@ -1,8 +1,6 @@
-selenium
-webdriver-manager
 pandas
-beautifulsoup4
-requests
+selenium
 gspread
-oauth2client
 gspread-dataframe
+oauth2client
+python-dotenv
