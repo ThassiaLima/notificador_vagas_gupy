@@ -51,5 +51,4 @@ jobs:
       - name: Pull com rebase
         run: |
           git pull --rebase || echo "Sem mudanças para rebase"
-
-          fi
+          

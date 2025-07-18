@@ -1,17 +1,25 @@
+# main.py
+
 import os
 import time
 import pandas as pd
 from datetime import datetime
 from utils import buscar_vagas, enviar_email, atualizar_google_sheets
 
-# Configurações
+# --- Configurações ---
 DATA_HOJE = datetime.now().strftime("%Y-%m-%d")
 ARQUIVO_CSV = "historico_vagas.csv"
-EMAIL_RECEPTOR = os.getenv("EMAIL_RECEPTOR")
-EMAIL_REMETENTE = os.getenv("EMAIL_REMETENTE")
-SENHA_REMETENTE = os.getenv("SENHA_REMETENTE")
 
+# Carrega as variáveis de ambiente (nomes ajustados para corresponder ao arquivo .yml)
+# É fundamental que os nomes em os.getenv() sejam os mesmos definidos no 'env' do workflow.
+EMAIL_RECEPTOR = os.getenv("EMAIL_DESTINO")
+EMAIL_REMETENTE = os.getenv("EMAIL_REMETENTE")
+SENHA_REMETENTE = os.getenv("SENHA_APP") # Corrigido de SENHA_REMETENTE para SENHA_APP
+
+# Lista de palavras-chave para buscar
 palavras_chave = ["Analista de BI", "Business Intelligence", "Data", "Dados", "Analytics", "Product", "Produto"]
+
+# Dicionário de empresas com suas respectivas URLs de carreira na Gupy
 empresas = {
     "Itaú": "https://vemproitau.gupy.io/",
     "Boticário": "https://grupoboticario.gupy.io/",
@@ -23,69 +31,97 @@ empresas = {
     "BMG": "https://bmg.gupy.io"
 }
 
-# Buscar novas vagas
+# --- 1. Buscar novas vagas ---
+print("🚀 Iniciando busca de vagas...")
 todas_vagas = []
-for empresa in empresas:
+# Alterado para iterar sobre o nome (empresa) e o valor (url) do dicionário
+for empresa, url in empresas.items():
     for palavra in palavras_chave:
         print(f"🔍 Buscando por: '{palavra}' em '{empresa}'")
-        vagas = buscar_vagas(empresa=empresa, palavra_chave=palavra)
+        # A função agora recebe a URL da empresa para construir o link de busca
+        vagas = buscar_vagas(empresa=empresa, palavra_chave=palavra, url_empresa=url)
         todas_vagas.extend(vagas)
-        time.sleep(1)
+        time.sleep(1) # Pausa para não sobrecarregar os servidores
 
+print(f"✅ Busca finalizada. Total de vagas encontradas na busca atual: {len(todas_vagas)}")
+
+# Cria um DataFrame com as vagas encontradas na execução de hoje
 df_novas = pd.DataFrame(todas_vagas)
-df_novas["data_abertura"] = DATA_HOJE
-df_novas["data_fechamento"] = pd.NA
-df_novas["status"] = "ativa"
 
-# Carregar histórico
+# Se nenhuma vaga for encontrada na busca, encerra o script mais cedo.
+if df_novas.empty:
+    print("ℹ️ Nenhuma vaga encontrada na busca de hoje. O histórico não será alterado.")
+    # Mesmo sem vagas novas, é bom atualizar o sheets para refletir possíveis fechamentos
+else:
+    df_novas["data_abertura"] = DATA_HOJE
+    df_novas["data_fechamento"] = pd.NA
+    df_novas["status"] = "ativa"
+
+
+# --- 2. Carregar e Processar Histórico ---
+print("📂 Carregando histórico de vagas...")
 if os.path.exists(ARQUIVO_CSV):
     historico = pd.read_csv(ARQUIVO_CSV)
+    # Garante que as colunas de data e status tenham o tipo correto
     historico["data_abertura"] = pd.to_datetime(historico["data_abertura"]).dt.strftime("%Y-%m-%d")
     historico["data_fechamento"] = historico["data_fechamento"].fillna(pd.NA)
     historico["status"] = historico["status"].fillna("ativa")
 else:
-    historico = pd.DataFrame(columns=df_novas.columns)
+    # Se o arquivo não existe, cria um histórico vazio com as colunas certas
+    colunas = df_novas.columns if not df_novas.empty else ['empresa', 'titulo', 'local', 'link', 'data_abertura', 'data_fechamento', 'status']
+    historico = pd.DataFrame(columns=colunas)
 
-# Links para comparação
+# --- 3. Comparar Vagas Atuais com Histórico ---
 links_historico_ativos = historico[historico["status"].isin(["ativa", "reaberta"])]["link"].tolist()
-links_atuais = df_novas["link"].tolist()
+links_atuais = [] if df_novas.empty else df_novas["link"].tolist()
 
-# Detectar novas vagas
-novas_vagas = df_novas[~df_novas["link"].isin(links_historico_ativos)]
+# Detectar vagas genuinamente novas (nunca vistas antes)
+vagas_para_notificar = pd.DataFrame()
+if not df_novas.empty:
+    vagas_para_notificar = df_novas[~df_novas["link"].isin(links_historico_ativos)]
 
-# Adicionar novas e reabertas
-for _, row in novas_vagas.iterrows():
-    link = row["link"]
-    if link in historico["link"].tolist():
-        row["status"] = "reaberta"
-    historico = pd.concat([historico, pd.DataFrame([row])], ignore_index=True)
+# Adicionar vagas novas e reabertas ao histórico
+if not vagas_para_notificar.empty:
+    for _, row in vagas_para_notificar.iterrows():
+        link = row["link"]
+        # Se o link já existe no histórico (foi fechada e agora reapareceu)
+        if link in historico["link"].tolist():
+            # Atualiza o status da vaga existente para 'reaberta'
+            historico.loc[historico["link"] == link, "status"] = "reaberta"
+            historico.loc[historico["link"] == link, "data_fechamento"] = pd.NA # Limpa a data de fechamento
+        else:
+            # Se for uma vaga 100% nova, adiciona ao histórico
+            historico = pd.concat([historico, pd.DataFrame([row])], ignore_index=True)
 
-# Atualizar status e data de fechamento para vagas que sumiram
-def atualizar_fechamento(row):
-    if pd.notna(row["status"]) and row["status"] in ["ativa", "reaberta"] and row["link"] not in links_atuais:
-        return DATA_HOJE
-    return row["data_fechamento"]
+# --- 4. Atualizar status de vagas fechadas ---
+# Vagas que estavam ativas/reabertas mas não foram encontradas na busca de hoje
+vagas_fechadas_mask = historico["status"].isin(["ativa", "reaberta"]) & ~historico["link"].isin(links_atuais)
 
-def atualizar_status(row):
-    if pd.notna(row["status"]) and row["status"] in ["ativa", "reaberta"] and row["link"] not in links_atuais:
-        return "fechada"
-    return row["status"]
+if vagas_fechadas_mask.any():
+    print(f"🚪 Detectadas {vagas_fechadas_mask.sum()} vagas que foram fechadas.")
+    historico.loc[vagas_fechadas_mask, "status"] = "fechada"
+    historico.loc[vagas_fechadas_mask, "data_fechamento"] = DATA_HOJE
+else:
+    print("ℹ️ Nenhuma vaga foi fechada desde a última execução.")
 
-historico["data_fechamento"] = historico.apply(atualizar_fechamento, axis=1)
-historico["status"] = historico.apply(atualizar_status, axis=1)
 
-# Salvar histórico
+# --- 5. Salvar e Enviar ---
+
+# Salvar o arquivo CSV atualizado
 historico.to_csv(ARQUIVO_CSV, index=False)
 print(f"💾 Histórico salvo com {len(historico)} vagas em '{ARQUIVO_CSV}'.")
 
-# Atualizar Google Sheets (opcional)
+# Atualizar o Google Sheets
 try:
     atualizar_google_sheets(historico)
 except Exception as e:
-    print(f"❌ Erro ao atualizar Google Sheets: {e}")
+    print(f"❌ Erro ao tentar atualizar Google Sheets: {e}")
 
-# Enviar email com novas vagas
-if not novas_vagas.empty and EMAIL_RECEPTOR and EMAIL_REMETENTE and SENHA_REMETENTE:
-    enviar_email(novas_vagas, EMAIL_RECEPTOR, EMAIL_REMETENTE, SENHA_REMETENTE)
+# Enviar email com as novas vagas encontradas
+if not vagas_para_notificar.empty and EMAIL_RECEPTOR and EMAIL_REMETENTE and SENHA_REMETENTE:
+    print(f"📧 Encontradas {len(vagas_para_notificar)} vagas novas para notificar.")
+    enviar_email(vagas_para_notificar, EMAIL_RECEPTOR, EMAIL_REMETENTE, SENHA_REMETENTE)
 else:
     print("📭 Nenhuma vaga nova para enviar ou variáveis de e-mail não configuradas.")
+
+print("✅ Processo concluído com sucesso!")
