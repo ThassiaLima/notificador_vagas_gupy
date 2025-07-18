@@ -41,12 +41,15 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git pull --rebase
 
-      - name: Commit e push dos arquivos atualizados
+      - name: Commit CSV atualizado
         run: |
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
-          
-          git add .
-          git commit -m "🔄 Atualização automática de vagas - $(date '+%Y-%m-%d %H:%M:%S')" || echo "Nada para commitar"
-          git push
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add historico_vagas.csv
+          git commit -m "Atualizando CSV com novas vagas" || echo "Nada para commitar"
+
+      - name: Pull com rebase
+        run: |
+          git pull --rebase || echo "Sem mudanças para rebase"
+
           fi
