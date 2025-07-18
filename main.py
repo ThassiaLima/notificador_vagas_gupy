@@ -139,13 +139,15 @@ novas_vagas["status"] = novas_vagas["link"].apply(
 
 # Marcar vagas que sumiram como fechadas
 historico["data_fechamento"] = historico.apply(
-    lambda row: DATA_HOJE if row["status"] in ["ativa", "reaberta"] and row["link"] not in links_atuais else row["data_fechamento"],
+    lambda row: DATA_HOJE if pd.notna(row["status"]) and row["status"] in ["ativa", "reaberta"] and pd.notna(row["link"]) and row["link"] not in links_atuais else row["data_fechamento"],
     axis=1
 )
+
 historico["status"] = historico.apply(
-    lambda row: "fechada" if row["status"] in ["ativa", "reaberta"] and row["link"] not in links_atuais else row["status"],
+    lambda row: "fechada" if pd.notna(row["status"]) and row["status"] in ["ativa", "reaberta"] and pd.notna(row["link"]) and row["link"] not in links_atuais else row["status"],
     axis=1
 )
+
 
 # Atualiza histórico
 historico_atualizado = pd.concat([historico, novas_vagas], ignore_index=True)
