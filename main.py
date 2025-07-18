@@ -39,7 +39,6 @@ EMAIL_DESTINO = os.getenv("EMAIL_DESTINO")
 # ==================== FUNÇÕES ====================
 
 def buscar_vagas(driver):
-    """Busca vagas nas empresas e retorna uma lista de dicionários."""
     todas_vagas = []
     wait = WebDriverWait(driver, 20)
 
@@ -77,7 +76,6 @@ def buscar_vagas(driver):
     return todas_vagas
 
 def enviar_email(vagas_para_notificar):
-    """Envia um e-mail com a lista de novas vagas."""
     if not vagas_para_notificar:
         print("📭 Nenhuma vaga nova para enviar por e-mail.")
         return
@@ -86,11 +84,9 @@ def enviar_email(vagas_para_notificar):
     msg["From"] = f"Notificador de Vagas <{EMAIL_REMETENTE}>"
     msg["To"] = EMAIL_DESTINO
     msg["Subject"] = f"📢 {len(vagas_para_notificar)} Novas Vagas Encontradas!"
-
     corpo_html = "<h2>🚀 Foram encontradas as seguintes oportunidades:</h2>"
     for vaga in vagas_para_notificar:
         corpo_html += f"<p><b>{vaga['titulo']}</b><br><b>Empresa:</b> {vaga['empresa']}<br><a href='{vaga['link']}'>Ver vaga</a></p><hr>"
-
     msg.attach(MIMEText(corpo_html, "html"))
 
     try:
@@ -102,7 +98,6 @@ def enviar_email(vagas_para_notificar):
         print(f"❌ Erro ao enviar e-mail: {e}")
 
 def atualizar_google_sheets(df):
-    """Atualiza a planilha do Google Sheets com o DataFrame fornecido."""
     print("🔄 Tentando atualizar o Google Sheets...")
     try:
         with open("credenciais.json", "r") as f:
@@ -114,90 +109,91 @@ def atualizar_google_sheets(df):
 
         spreadsheet = client.open("Historico Vagas Gupy")
         sheet = spreadsheet.sheet1
-        
         df_to_upload = df.fillna("")
-
         sheet.clear()
         set_with_dataframe(sheet, df_to_upload)
         print("✅ Planilha Google Sheets atualizada com sucesso!")
     except Exception as e:
-        print(f"❌ Erro ao atualizar Google Sheets: {e}")
+        # Lança a exceção novamente para ser capturada no bloco principal
+        raise e
 
 # ==================== EXECUÇÃO PRINCIPAL ====================
 if __name__ == "__main__":
-    # 1. Carrega o histórico
-    colunas_historico = ["empresa", "titulo", "link", "data_abertura", "status", "data_fechamento"]
-    if os.path.exists(ARQUIVO_CSV):
-        # Garantir que a coluna de link seja lida como texto (string) para evitar problemas de tipo
-        historico_df = pd.read_csv(ARQUIVO_CSV, dtype={"link": str})
-    else:
-        historico_df = pd.DataFrame(columns=colunas_historico)
-
-    # 2. Busca as vagas atuais
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    driver = webdriver.Chrome(options=chrome_options)
-    
-    vagas_atuais_lista = buscar_vagas(driver)
-    driver.quit()
-
-    if not vagas_atuais_lista:
-        print("Nenhuma vaga encontrada na busca atual. Encerrando.")
-    else:
-        vagas_atuais_df = pd.DataFrame(vagas_atuais_lista).drop_duplicates(subset="link")
-
-        # 3. Lógica de comparação e atualização com LOGS DE DEBUG
-        print("\n--- INICIANDO COMPARAÇÃO DE VAGAS ---")
-        print(f"Histórico carregado com {len(historico_df)} vagas.")
-        print(f"Busca atual encontrou {len(vagas_atuais_df)} vagas únicas.")
-
-        links_historico = set(historico_df["link"])
-        links_atuais = set(vagas_atuais_df["link"])
-
-        print(f"Total de links únicos no histórico: {len(links_historico)}")
-        print(f"Total de links únicos na busca atual: {len(links_atuais)}")
-        
-        links_novos = links_atuais - links_historico
-        print(f"Número de links novos encontrados (diferença): {len(links_novos)}")
-
-        vagas_para_notificar_df = vagas_atuais_df[vagas_atuais_df["link"].isin(links_novos)].copy()
-        
-        # =================================================================
-        # LOG SOLICITADO: MOSTRA AS VAGAS QUE SERÃO ENVIADAS POR E-MAIL
-        # =================================================================
-        print("\n--- VAGAS IDENTIFICADAS COMO NOVAS PARA NOTIFICAÇÃO ---")
-        if not vagas_para_notificar_df.empty:
-            print(vagas_para_notificar_df.to_string())
+    try:
+        # 1. Carrega o histórico
+        if os.path.exists(ARQUIVO_CSV):
+            historico_df = pd.read_csv(ARQUIVO_CSV, dtype={"link": str})
         else:
-            print("NENHUMA VAGA NOVA PARA NOTIFICAR.")
-        print("--- FIM DO LOG DE VAGAS NOVAS ---\n")
-        # =================================================================
+            historico_df = pd.DataFrame(columns=["empresa", "titulo", "link", "data_abertura", "status", "data_fechamento"])
 
-        if not vagas_para_notificar_df.empty:
-            vagas_para_notificar_df["data_abertura"] = DATA_HOJE
-            vagas_para_notificar_df["status"] = "ativa"
-            vagas_para_notificar_df["data_fechamento"] = pd.NA
-            historico_df = pd.concat([historico_df, vagas_para_notificar_df], ignore_index=True)
+        # 2. Busca as vagas atuais
+        chrome_options = Options()
+        chrome_options.add_argument("--headless")
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        driver = webdriver.Chrome(options=chrome_options)
+        
+        vagas_atuais_lista = buscar_vagas(driver)
+        driver.quit()
 
-        links_fechados = links_historico - links_atuais
-        if links_fechados:
-            print(f"🚪 {len(links_fechados)} vagas foram fechadas.")
-            historico_df.loc[
-                (historico_df["link"].isin(links_fechados)) & (historico_df["status"] == "ativa"), 
-                ["status", "data_fechamento"]
-            ] = ["fechada", DATA_HOJE]
-
-        # 4. Salvar e enviar
-        historico_df.to_csv(ARQUIVO_CSV, index=False)
-        print(f"💾 Histórico final salvo com {len(historico_df)} vagas em '{ARQUIVO_CSV}'.")
-
-        # 5. Atualizar Google Sheets
-        atualizar_google_sheets(historico_df)
-
-        # 6. Enviar e-mail APENAS com as vagas novas
-        if EMAIL_REMETENTE and SENHA_APP and EMAIL_DESTINO:
-            enviar_email(vagas_para_notificar_df.to_dict("records"))
+        if not vagas_atuais_lista:
+            print("Nenhuma vaga encontrada na busca atual. Encerrando.")
         else:
-            print("⚠️ Variáveis de e-mail não configuradas.")
+            vagas_atuais_df = pd.DataFrame(vagas_atuais_lista).drop_duplicates(subset="link")
+
+            # 3. Lógica de comparação
+            links_historico = set(historico_df["link"])
+            links_atuais = set(vagas_atuais_df["link"])
+            links_novos = links_atuais - links_historico
+            vagas_para_notificar_df = vagas_atuais_df[vagas_atuais_df["link"].isin(links_novos)].copy()
+            
+            print("\n--- VAGAS IDENTIFICADAS COMO NOVAS ---")
+            if not vagas_para_notificar_df.empty:
+                print(vagas_para_notificar_df.to_string())
+            else:
+                print("NENHUMA VAGA NOVA PARA NOTIFICAR.")
+            print("--- FIM DO LOG DE VAGAS NOVAS ---\n")
+
+            if not vagas_para_notificar_df.empty:
+                vagas_para_notificar_df["data_abertura"] = DATA_HOJE
+                vagas_para_notificar_df["status"] = "ativa"
+                vagas_para_notificar_df["data_fechamento"] = pd.NA
+                historico_df = pd.concat([historico_df, vagas_para_notificar_df], ignore_index=True)
+
+            links_fechados = links_historico - links_atuais
+            if links_fechados:
+                print(f"🚪 {len(links_fechados)} vagas foram fechadas.")
+                historico_df.loc[
+                    (historico_df["link"].isin(links_fechados)) & (historico_df["status"] == "ativa"), 
+                    ["status", "data_fechamento"]
+                ] = ["fechada", DATA_HOJE]
+
+            # 4. Salvar CSV
+            try:
+                historico_df.to_csv(ARQUIVO_CSV, index=False)
+                print(f"💾 Histórico final salvo com {len(historico_df)} vagas em '{ARQUIVO_CSV}'.")
+            except Exception as e:
+                print(f"❌ CRÍTICO: Falha ao salvar o arquivo CSV: {e}")
+                exit(1) # Encerra se não conseguir salvar o arquivo mais importante
+
+            # 5. Atualizar Google Sheets
+            try:
+                atualizar_google_sheets(historico_df)
+            except Exception as e:
+                print(f"⚠️ AVISO: Falha ao atualizar o Google Sheets: {e}")
+                # Não encerra o script, pois o CSV já foi salvo
+
+            # 6. Enviar e-mail
+            try:
+                if EMAIL_REMETENTE and SENHA_APP and EMAIL_DESTINO:
+                    enviar_email(vagas_para_notificar_df.to_dict("records"))
+                else:
+                    print("⚠️ Variáveis de e-mail não configuradas.")
+            except Exception as e:
+                print(f"⚠️ AVISO: Falha ao enviar o e-mail: {e}")
+
+    except Exception as e:
+        print(f"❌ OCORREU UM ERRO INESPERADO NA EXECUÇÃO PRINCIPAL: {e}")
+        exit(1)
+
+    print("\n✅ Processo concluído com sucesso.")
