@@ -147,8 +147,10 @@ driver.quit()
 
 df_atuais = pd.DataFrame(vagas_atuais).drop_duplicates(subset="link")
 
-# Prepara novas vagas
-novas_vagas = df_atuais[~df_atuais["link"].isin(historico["link"])].copy()
+# Seleciona apenas vagas realmente novas (não estão no histórico ou estavam fechadas)
+links_historico_abertos = historico[pd.isna(historico["data_fechamento"])]["link"].tolist()
+novas_vagas = df_atuais[~df_atuais["link"].isin(links_historico_abertos)].copy()
+
 novas_vagas["data_abertura"] = DATA_HOJE
 novas_vagas["data_fechamento"] = pd.NA
 
