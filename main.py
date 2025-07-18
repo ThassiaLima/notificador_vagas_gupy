@@ -28,12 +28,13 @@ PALAVRAS_CHAVE = ["Analista de BI", "Business Intelligence", "Data", "Dados", "A
 EMPRESAS = {
     "Itaú": "https://vemproitau.gupy.io/",
     "Boticário": "https://grupoboticario.gupy.io/",
-    "Raízen": "https://genteraizen.gupy.io/",
+     "Raízen": "https://genteraizen.gupy.io/",
     "C&A": "https://cea.gupy.io/",
     "AmbevTech": "https://ambevtech.gupy.io",
     "OLX": "https://vemsergrupoolx.gupy.io",
     "Localiza": "https://localiza.gupy.io",
     "BMG": "https://bmg.gupy.io"
+   
 }
 ARQUIVO_CSV = "historico_vagas.csv"
 DATA_HOJE = str(date.today())
